@@ -1,9 +1,8 @@
-ENV["FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT"] = "120"
+ENV['FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT'] = '120'
 default_platform(:ios)
 
 # 打包
 platform :ios do
-
   # 打包
   lane :ipaPackage do |options|
     package(
@@ -16,7 +15,8 @@ platform :ios do
       is_detect_unused_code: options[:is_detect_unused_code],
       is_detect_unused_image: options[:is_detect_unused_image],
       changelog: options[:changelog], # fir 更新日志
-      release_notes: options[:release_notes] # 配合 jenkins 传参上传 appstore 格式为 { \"zh-Hans\": \"修复问题\", \"en-US\": \"bugfix\"} JSON 字符串
+      release_notes: options[:release_notes], # 配合 jenkins 传参上传 appstore 格式为 { \"zh-Hans\": \"修复问题\", \"en-US\": \"bugfix\"} JSON 字符串
+      is_notice_dingding: options[:is_notice_dingding] # 控制钉钉发送通知的参数
     )
   end
 
@@ -50,5 +50,4 @@ platform :ios do
       exclude: nil # 要排除的路径，多个路径用逗号分隔。默认会排除 Carthage 和 Pods 目录
     )
   end
-
 end

@@ -71,7 +71,8 @@ package(
 	is_detect_unused_code: false, # 是否检测未使用代码
 	is_detect_unused_image: false, # 是否检测未使用图片
 	changelog: options[:changelog], # fir 更新日志
-    release_notes: options[:release_notes] # 配合 jenkins 传参上传 appstore 格式为 { \"zh-Hans\": \"修复问题\", \"en-US\": \"bugfix\"} JSON 字符串 
+    release_notes: options[:release_notes], # 配合 jenkins 传参上传 appstore 格式为 { \"zh-Hans\": \"修复问题\", \"en-US\": \"bugfix\"} JSON 字符串 
+	is_notice_dingding: options[:is_notice_dingding] # 配置钉钉token了，通过该参数控制是否发送通知
 )
 ```
 
