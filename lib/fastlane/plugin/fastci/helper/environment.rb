@@ -9,6 +9,19 @@ module Fastlane
         ENV['CONNECT_ISSUER_ID']
       end
 
+      # App Store Connect API Key 的 P8 文件路径；未设置时沿用证书目录默认路径。
+      def self.app_store_connect_p8_path
+        configured_path = ENV['DINO_APP_STORE_CONNECT_P8_PATH'].to_s.strip
+        return configured_path unless configured_path.empty?
+
+        File.join(package_file_folder_name.to_s, "AuthKey_#{connect_key_id}.p8")
+      end
+
+      # 标准 App Store Connect API Key JSON 路径，适用于 Jenkins Secret file。
+      def self.app_store_connect_api_key_path
+        ENV['APP_STORE_CONNECT_API_KEY_PATH'].to_s.strip
+      end
+
       # 项目配置
       def self.scheme
         ENV['SCHEME_NAME']

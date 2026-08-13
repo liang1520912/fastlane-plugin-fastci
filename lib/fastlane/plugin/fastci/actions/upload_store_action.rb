@@ -9,24 +9,30 @@ module Fastlane
 
         release_notes = JSON.parse(params[:release_notes] || "") rescue nil
 
-        other_action.app_store_connect_api_key(
-          key_id: Environment.connect_key_id,
-          issuer_id: Environment.connect_issuer_id,
-          key_filepath: File.expand_path("#{Environment.package_file_folder_name}/AuthKey_#{Environment.connect_key_id}.p8"),
-          duration: 1200, # optional (maximum 1200)
-          in_house: false # optional but may be required if using match/sigh
-        )
+        api_key_options = {}
+        if CommonHelper.is_validate_string(Environment.app_store_connect_api_key_path)
+          api_key_options[:api_key_path] = Environment.app_store_connect_api_key_path
+        else
+          other_action.app_store_connect_api_key(
+            key_id: Environment.connect_key_id,
+            issuer_id: Environment.connect_issuer_id,
+            key_filepath: File.expand_path(Environment.app_store_connect_p8_path),
+            duration: 1200, # optional (maximum 1200)
+            in_house: false # optional but may be required if using match/sigh
+          )
+        end
 
         if params[:isTestFlight]
           UI.message("*************| 开始上传 TestFlight |*************")
           upload_options = {
-            skip_waiting_for_build_processing: !params[:testflight_distribute_external],
+            # 测试内容只能在 Build 处理完成后写入；无测试内容且不分发外测时才可提前结束。
+            skip_waiting_for_build_processing: params[:testflight_changelog].to_s.empty? && !params[:testflight_distribute_external],
             distribute_external: params[:testflight_distribute_external],
             notify_external_testers: params[:testflight_notify_external_testers]
           }
           upload_options[:changelog] = params[:testflight_changelog] if params[:testflight_changelog].to_s.length > 0
           upload_options[:groups] = params[:testflight_groups] if params[:testflight_groups]
-          other_action.upload_to_testflight(upload_options)
+          other_action.upload_to_testflight(upload_options.merge(api_key_options))
         else
           UI.message("*************| 开始上传 AppStore |*************")
           
@@ -46,7 +52,7 @@ module Fastlane
             upload_options[:release_notes] = release_notes
           end
           
-          other_action.upload_to_app_store(upload_options)
+          other_action.upload_to_app_store(upload_options.merge(api_key_options))
         end
       end
 

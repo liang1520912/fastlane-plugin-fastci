@@ -153,7 +153,10 @@ module Fastlane
           notiText = "🚀🚀🚀🚀🚀🚀\n\n#{scheme}-iOS-打包完成\n\n#{version}_#{build}_#{export_method}\n\n🚀🚀🚀🚀🚀🚀"
           send_dingding_notice.call(notiText)
 
-          if CommonHelper.is_validate_string(Environment.connect_key_id) && CommonHelper.is_validate_string(Environment.connect_issuer_id)
+          has_p8_api_key = CommonHelper.is_validate_string(Environment.connect_key_id) &&
+            CommonHelper.is_validate_string(Environment.connect_issuer_id)
+          has_api_key_json = CommonHelper.is_validate_string(Environment.app_store_connect_api_key_path)
+          if has_p8_api_key || has_api_key_json
             # 根据 export_method 决定是否为 TestFlight
             is_test_flight = export_method == 'testFlight'
 
