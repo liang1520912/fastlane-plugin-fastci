@@ -1,9 +1,10 @@
-describe Fastlane::Actions::FastciAction do
-  describe '#run' do
-    it 'prints a message' do
-      expect(Fastlane::UI).to receive(:message).with("The fastci plugin is working!")
+require 'spec_helper'
 
-      Fastlane::Actions::FastciAction.run(nil)
+describe Fastlane::Actions::AppStoreResourcesAction do
+  describe '.description' do
+    it 'describes App Store Connect resource publishing' do
+      expect(described_class.description).to include('metadata')
+      expect(described_class.description).to include('截图')
     end
   end
 end

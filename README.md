@@ -72,9 +72,13 @@ package(
 	is_detect_unused_image: false, # 是否检测未使用图片
 	changelog: options[:changelog], # fir 更新日志
     release_notes: options[:release_notes], # 配合 jenkins 传参上传 appstore 格式为 { \"zh-Hans\": \"修复问题\", \"en-US\": \"bugfix\"} JSON 字符串 
-	is_notice_dingding: options[:is_notice_dingding] # 配置钉钉token了，通过该参数控制是否发送通知
+	is_notice_dingding: options[:is_notice_dingding], # 配置钉钉token了，通过该参数控制是否发送通知
+	# app-store 时可传入资源发布配置；上传 IPA 后自动更新资源、选择构建并按配置提交审核
+	app_store_resources_config_path: "fastlane/app_store_resources.json"
 )
 ```
+
+当 `export_method` 为 `app-store` 且配置了 `app_store_resources_config_path` 时，完整流程为：打包并上传 IPA、上传变更的 metadata 和截图、按精确的版本号和 Build Number 选择构建；只有 `submit_for_review` 明确设置为 `true` 时才提交审核。该参数未配置时，`package` 保持原有行为。
 
 ### 2. SwiftLint 静态代码分析
 功能：依赖 ` SwiftLint ` 对项目代码进行静态分析，生成分析报告。
@@ -89,6 +93,36 @@ analyze_swiftlint(
 	commit_hash: nil # 指定 commit hash，仅检查变更文件
 )
 ```
+
+TestFlight 打包时可以单独配置 TestFlight Build Number 和测试内容。该 Build Number 会写入 TestFlight IPA，并在上传后按 `App Version + TestFlight Build Number` 等待和校验，不会使用 App Store 发布流程的构建选择逻辑：
+
+```ruby
+package(
+  export_method: "testFlight",
+  testflight_config_path: "fastlane/testflight_release.json"
+)
+```
+
+也可以直接传入 `testflight_build_number`、`testflight_changelog` 等参数，不使用配置文件。
+
+`fastlane/testflight_release.json` 示例：
+
+```json
+{
+  "app_identifier": "com.example.app",
+  "app_version": "7.0.0",
+  "testflight_build_number": "2026081302",
+  "changelog": "请重点测试登录、消息和支付流程。",
+  "api_key_path": "/path/to/api-key.json",
+  "wait_for_build_processing": true,
+  "build_processing_timeout": 3600,
+  "build_processing_poll_interval": 30,
+  "distribute_external": false,
+  "notify_external_testers": false
+}
+```
+
+`distribute_external` 和 `notify_external_testers` 默认均为 `false`，当前不会自动分发或通知外部测试人员。TestFlight 上传成功后，插件会确认指定的 TestFlight 构建已处理完成；找不到对应构建或构建处理失败时，Jenkins 构建会失败。
 
 ### 3. 检测重复代码
 功能：检测项目中的重复代码，生成分析报告。
@@ -121,6 +155,84 @@ detect_unused_image(
     exclude: nil # 要排除的路径，多个路径用逗号分隔。默认会排除 Carthage 和 Pods 目录
 )
 ```
+
+### 6. App Store Connect 资源管理
+功能：校验 metadata 和截图目录，按资源变更结果上传对应资源；资源缺失时可以从 App Store Connect 下载。
+该 action 只上传资源，不上传 IPA，不会改变已有 `package` 和 `upload_store` 的默认行为。
+
+```ruby
+app_store_resources(
+  config_path: "fastlane/app_store_resources.json"
+)
+```
+
+`fastlane/app_store_resources.json` 示例：
+
+```json
+{
+  "app_identifier": "com.example.app",
+  "app_version": "1.0.0",
+  "metadata_path": "fastlane/metadata",
+  "screenshots_path": "fastlane/screenshots",
+  "metadata_changed": true,
+  "screenshots_changed": true,
+  "download_missing_metadata": true,
+  "download_missing_screenshots": true,
+  "use_live_version": false,
+  "api_key_path": "/path/to/api-key.json",
+  "select_build": true,
+  "build_number": "2026081301",
+  "wait_for_build_processing": true,
+  "build_processing_timeout": 3600,
+  "build_processing_poll_interval": 30,
+  "submit_for_review": false,
+  "automatic_release": false
+}
+```
+
+也可以在调用 action 时覆盖配置文件中的单个值，显式参数优先：
+
+```ruby
+app_store_resources(
+  config_path: "fastlane/app_store_resources.json",
+  metadata_changed: false,
+  screenshots_changed: true
+)
+```
+
+参数说明：
+
+- `config_path`：JSON 配置文件路径。
+- `app_identifier`：App Store Connect App 的 Bundle ID，必须通过配置文件或 action 参数提供。
+- `app_version`：要更新的 App Store 版本号，可选。
+- `metadata_path`：metadata 目录，默认 `fastlane/metadata`。
+- `screenshots_path`：截图目录，默认 `fastlane/screenshots`。
+- `metadata_changed`：为 `true` 时校验并上传 metadata；没有变化时设置为 `false`。
+- `screenshots_changed`：为 `true` 时校验并上传截图；没有变化时设置为 `false`。
+- `download_missing_metadata`：metadata 目录为空时从 App Store Connect 下载。
+- `download_missing_screenshots`：截图目录为空时从 App Store Connect 下载。
+- `use_live_version`：下载截图时使用线上版本；默认使用可编辑版本。
+- `api_key_path` 或 `api_key`：App Store Connect API Key，二选一，也可以复用 Fastlane 已设置的 API token。
+- `select_build`：是否选择指定的 App Store Connect 构建，默认 `false`。
+- `build_number`：要选择的精确构建号。开启 `select_build` 或 `submit_for_review` 时必须填写，不会自动猜测最新构建。
+- `wait_for_build_processing`：选择构建前是否等待 Apple 处理完成，默认 `true`。
+- `build_processing_timeout` 和 `build_processing_poll_interval`：等待构建处理的超时时间和轮询间隔，单位均为秒。
+- `submit_for_review`：是否提交审核，默认 `false`。提交审核前会先选择指定构建。
+- `automatic_release`：审核通过后是否自动发布，默认 `false`；只在 `submit_for_review` 为 `true` 时生效。
+- `submission_information`：提交审核所需信息，例如 `{"export_compliance_uses_encryption": false}`。
+
+只更新资源、不上传 IPA 时，直接调用 `app_store_resources`。完整的打包发布流程则在 `package(export_method: "app-store")` 中传入 `app_store_resources_config_path`。资源变化开关可按实际情况配置：
+
+```json
+{
+  "metadata_changed": true,
+  "screenshots_changed": false,
+  "select_build": true,
+  "submit_for_review": false
+}
+```
+
+其中截图没有变化时不会上传截图，但仍然可以选择本次 IPA 对应的构建。
 
 ---
 

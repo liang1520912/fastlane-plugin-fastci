@@ -19,15 +19,20 @@ module Fastlane
 
         if params[:isTestFlight]
           UI.message("*************| 开始上传 TestFlight |*************")
-          other_action.upload_to_testflight(
-            skip_waiting_for_build_processing: true
-          )
+          upload_options = {
+            skip_waiting_for_build_processing: !params[:testflight_distribute_external],
+            distribute_external: params[:testflight_distribute_external],
+            notify_external_testers: params[:testflight_notify_external_testers]
+          }
+          upload_options[:changelog] = params[:testflight_changelog] if params[:testflight_changelog].to_s.length > 0
+          upload_options[:groups] = params[:testflight_groups] if params[:testflight_groups]
+          other_action.upload_to_testflight(upload_options)
         else
           UI.message("*************| 开始上传 AppStore |*************")
           
           # 构建上传参数，只有当 release_notes 有效时才添加
           upload_options = {
-            skip_metadata: false,
+            skip_metadata: params[:skip_metadata],
             skip_screenshots: true,
             run_precheck_before_submit: false,
             precheck_include_in_app_purchases: false,
@@ -62,6 +67,41 @@ module Fastlane
             description: "是否为 TestFlight 打包",
             optional: false,
             type: Boolean
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :skip_metadata,
+            description: '上传 IPA 时是否跳过 metadata，资源由 app_store_resources 管理时应开启',
+            optional: true,
+            default_value: false,
+            type: Boolean
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :testflight_changelog,
+            description: 'TestFlight 测试内容（What to Test）',
+            optional: true,
+            default_value: nil,
+            type: String
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :testflight_distribute_external,
+            description: '是否将 TestFlight 构建分发给外部测试组，默认关闭',
+            optional: true,
+            default_value: false,
+            type: Boolean
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :testflight_notify_external_testers,
+            description: '分发到外部测试组时是否通知测试人员，默认关闭',
+            optional: true,
+            default_value: false,
+            type: Boolean
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :testflight_groups,
+            description: 'TestFlight 外部测试组名称或 ID 列表',
+            optional: true,
+            default_value: nil,
+            type: Array
           )
         ]
       end

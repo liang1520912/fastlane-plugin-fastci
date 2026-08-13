@@ -18,6 +18,14 @@ module Fastlane
         is_detect_unused_code = params[:is_detect_unused_code] || false
         is_detect_unused_image = params[:is_detect_unused_image] || false
         release_notes = params[:release_notes] || ''
+        app_store_resources_config_path = params[:app_store_resources_config_path]
+        testflight_config_path = params[:testflight_config_path]
+        testflight_params = {}
+        if export_method == 'testFlight'
+          testflight_params = AppStoreResourcesHelper.load_testflight_params(params)
+          build = testflight_params[:testflight_build_number] if testflight_params[:testflight_build_number]
+          release_notes = testflight_params[:changelog] if release_notes.to_s.empty? && testflight_params[:changelog]
+        end
         configuration = 'Release' if %w[app-store testFlight].include?(export_method)
         is_notice_dingding = params[:is_notice_dingding].nil? ? true : params[:is_notice_dingding]
         # 统一发送钉钉消息匿名函数
@@ -151,8 +159,31 @@ module Fastlane
 
             other_action.upload_store(
               release_notes: release_notes,
-              isTestFlight: is_test_flight
+              isTestFlight: is_test_flight,
+              skip_metadata: !app_store_resources_config_path.to_s.empty?,
+              testflight_changelog: testflight_params[:changelog],
+              testflight_distribute_external: testflight_params[:distribute_external],
+              testflight_notify_external_testers: testflight_params[:notify_external_testers],
+              testflight_groups: testflight_params[:groups]
             )
+
+            if is_test_flight && testflight_params[:testflight_build_number]
+              AppStoreResourcesHelper.verify_testflight_build(
+                testflight_params.merge(
+                  app_identifier: Environment.bundleID,
+                  app_version: version.to_s,
+                  testflight_build_number: build.to_s
+                )
+              )
+            elsif !is_test_flight && !app_store_resources_config_path.to_s.empty?
+              other_action.app_store_resources(
+                config_path: app_store_resources_config_path,
+                app_identifier: Environment.bundleID,
+                app_version: version.to_s,
+                build_number: build.to_s,
+                select_build: params[:select_build_after_upload]
+              )
+            end
             notiText = "🚀🚀🚀🚀🚀🚀\n\n#{scheme}-iOS-上传完成\n\n#{version}_#{build}_#{export_method}\n\n🚀🚀🚀🚀🚀🚀"
             send_dingding_notice.call(notiText)
           end
@@ -343,6 +374,68 @@ module Fastlane
             description: '更新文案, 格式为 { "zh-Hans": "修复问题", "en-US": "bugfix"} JSON 字符串',
             optional: true,
             type: String
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :app_store_resources_config_path,
+            description: 'App Store 资源、构建选择和审核提交 JSON 配置文件路径；仅用于 app-store',
+            optional: true,
+            default_value: nil,
+            type: String,
+            verify_block: proc do |value|
+              UI.user_error!("App Store 资源配置文件不存在: #{value}") unless File.file?(File.expand_path(value))
+            end
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :select_build_after_upload,
+            description: 'IPA 上传后是否自动选择本次构建；未配置时由资源 JSON 的 select_build 控制',
+            optional: true,
+            default_value: nil,
+            type: Boolean
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :testflight_config_path,
+            description: 'TestFlight 测试内容、Build 校验和分发配置文件路径；仅用于 testFlight',
+            optional: true,
+            default_value: nil,
+            type: String,
+            verify_block: proc do |value|
+              UI.user_error!("TestFlight 配置文件不存在: #{value}") unless File.file?(File.expand_path(value))
+            end
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :testflight_build_number,
+            description: 'TestFlight 专用 Build Number；优先使用 testflight_config_path 中的配置',
+            optional: true,
+            default_value: nil,
+            type: String
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :testflight_changelog,
+            description: 'TestFlight 测试内容（What to Test）',
+            optional: true,
+            default_value: nil,
+            type: String
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :testflight_distribute_external,
+            description: '是否自动分发 TestFlight 构建到外部测试组，默认关闭',
+            optional: true,
+            default_value: false,
+            type: Boolean
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :testflight_notify_external_testers,
+            description: '分发 TestFlight 构建时是否通知外部测试人员，默认关闭',
+            optional: true,
+            default_value: false,
+            type: Boolean
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :testflight_groups,
+            description: 'TestFlight 外部测试组名称或 ID 列表',
+            optional: true,
+            default_value: nil,
+            type: Array
           ),
           FastlaneCore::ConfigItem.new(
             key: :is_notice_dingding,
