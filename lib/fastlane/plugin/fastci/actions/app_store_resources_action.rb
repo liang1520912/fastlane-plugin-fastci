@@ -106,6 +106,13 @@ module Fastlane
             type: Boolean
           ),
           FastlaneCore::ConfigItem.new(
+            key: :upload_metadata_on_new_version,
+            description: '目标 App Store 版本不存在时是否强制上传 metadata',
+            optional: true,
+            default_value: true,
+            type: Boolean
+          ),
+          FastlaneCore::ConfigItem.new(
             key: :download_missing_metadata,
             description: 'metadata 缺失时是否从 App Store Connect 下载',
             optional: true,

@@ -80,6 +80,8 @@ package(
 
 当 `export_method` 为 `app-store` 且配置了 `app_store_resources_config_path` 时，完整流程为：打包并上传 IPA、上传变更的 metadata 和截图、按精确的版本号和 Build Number 选择构建；只有 `submit_for_review` 明确设置为 `true` 时才提交审核。该参数未配置时，`package` 保持原有行为。
 
+当配置 `upload_metadata_on_new_version: true`（默认值）时，`package` 会在上传 IPA 前检查目标 App Store 版本。如果目标版本尚不存在，即使 `metadata_changed` 为 `false`，也会强制上传 metadata，适用于推广文案在多个版本中保持不变但每个新版本都必须填写的场景。
+
 ### 2. SwiftLint 静态代码分析
 功能：依赖 ` SwiftLint ` 对项目代码进行静态分析，生成分析报告。
 使用前需要参考自定义 [` .swiftlint.yml `](/.swiftlint.yml) 文件，并将该文件放到项目根目录。
@@ -209,6 +211,7 @@ app_store_resources(
 - `screenshots_path`：截图目录，默认 `fastlane/screenshots`。
 - `metadata_changed`：为 `true` 时校验并上传 metadata；没有变化时设置为 `false`。
 - `screenshots_changed`：为 `true` 时校验并上传截图；没有变化时设置为 `false`。
+- `upload_metadata_on_new_version`：目标 App Store 版本不存在时是否强制上传 metadata，默认 `true`。
 - `download_missing_metadata`：metadata 目录为空时从 App Store Connect 下载。
 - `download_missing_screenshots`：截图目录为空时从 App Store Connect 下载。
 - `use_live_version`：下载截图时使用线上版本；默认使用可编辑版本。

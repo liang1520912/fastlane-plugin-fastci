@@ -14,6 +14,7 @@ module Fastlane
         screenshots_path
         metadata_changed
         screenshots_changed
+        upload_metadata_on_new_version
         download_missing_metadata
         download_missing_screenshots
         use_live_version
@@ -39,6 +40,7 @@ module Fastlane
         screenshots_path: 'fastlane/screenshots',
         metadata_changed: true,
         screenshots_changed: true,
+        upload_metadata_on_new_version: true,
         download_missing_metadata: false,
         download_missing_screenshots: false,
         use_live_version: false,
@@ -191,6 +193,19 @@ module Fastlane
           options[:username] = params[:username] if params[:username]
           options[:platform] = params[:platform] if params[:platform]
         end
+      end
+
+      # 在 IPA 上传前判断目标版本是否已经存在，避免新版本漏传 metadata。
+      def self.metadata_required_for_new_version?(params)
+        return false unless params[:upload_metadata_on_new_version]
+
+        authenticate(params)
+        app = Spaceship::ConnectAPI::App.find(params[:app_identifier])
+        UI.user_error!("找不到 App Store Connect 应用: #{params[:app_identifier]}") unless app
+
+        platform = Spaceship::ConnectAPI::Platform.map(params[:platform])
+        version = app.get_edit_app_store_version(platform: platform)
+        version.nil? || version.version_string != params[:app_version].to_s
       end
 
       def self.download_options(params, metadata_path, screenshots_path)

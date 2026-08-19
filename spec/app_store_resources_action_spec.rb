@@ -113,6 +113,38 @@ describe Fastlane::Helper::AppStoreResourcesHelper do
     end
   end
 
+  describe '.metadata_required_for_new_version?' do
+    before do
+      allow(described_class).to receive(:authenticate)
+      allow(Spaceship::ConnectAPI::App).to receive(:find).with('com.example.app').and_return(app)
+      allow(Spaceship::ConnectAPI::Platform).to receive(:map).with('ios').and_return(:ios)
+    end
+
+    let(:app) { instance_double('Spaceship::ConnectAPI::App') }
+    let(:params) do
+      {
+        app_identifier: 'com.example.app',
+        app_version: '8.0.0',
+        platform: 'ios',
+        upload_metadata_on_new_version: true
+      }
+    end
+
+    it 'requires metadata when the target version does not exist' do
+      version = nil
+      allow(app).to receive(:get_edit_app_store_version).with(platform: :ios).and_return(version)
+
+      expect(described_class.metadata_required_for_new_version?(params)).to be(true)
+    end
+
+    it 'does not force metadata when the target version already exists' do
+      version = instance_double('Spaceship::ConnectAPI::AppStoreVersion', version_string: '8.0.0')
+      allow(app).to receive(:get_edit_app_store_version).with(platform: :ios).and_return(version)
+
+      expect(described_class.metadata_required_for_new_version?(params)).to be(false)
+    end
+  end
+
   describe '.review_options' do
     it 'submits the selected build without uploading another IPA' do
       options = described_class.review_options(

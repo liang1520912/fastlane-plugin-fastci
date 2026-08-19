@@ -160,6 +160,21 @@ module Fastlane
             # 根据 export_method 决定是否为 TestFlight
             is_test_flight = export_method == 'testFlight'
 
+            metadata_required_for_new_version = false
+            unless is_test_flight || app_store_resources_config_path.to_s.empty?
+              resource_params = AppStoreResourcesHelper.load_params(
+                config_path: app_store_resources_config_path,
+                app_identifier: Environment.bundleID,
+                app_version: version.to_s,
+                build_number: build.to_s
+              )
+              metadata_required_for_new_version =
+                AppStoreResourcesHelper.metadata_required_for_new_version?(resource_params)
+              UI.message(
+                "目标 App Store 版本 #{version} #{metadata_required_for_new_version ? '不存在，将强制上传 metadata' : '已存在，按资源变更配置处理'}"
+              )
+            end
+
             other_action.upload_store(
               release_notes: release_notes,
               isTestFlight: is_test_flight,
@@ -179,12 +194,16 @@ module Fastlane
                 )
               )
             elsif !is_test_flight && !app_store_resources_config_path.to_s.empty?
-              other_action.app_store_resources(
+              resource_options = {
                 config_path: app_store_resources_config_path,
                 app_identifier: Environment.bundleID,
                 app_version: version.to_s,
                 build_number: build.to_s,
                 select_build: params[:select_build_after_upload]
+              }
+              resource_options[:metadata_changed] = true if metadata_required_for_new_version
+              other_action.app_store_resources(
+                resource_options
               )
             end
             notiText = "🚀🚀🚀🚀🚀🚀\n\n#{scheme}-iOS-上传完成\n\n#{version}_#{build}_#{export_method}\n\n🚀🚀🚀🚀🚀🚀"
