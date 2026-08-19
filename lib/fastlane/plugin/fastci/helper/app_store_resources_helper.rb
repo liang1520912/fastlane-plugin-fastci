@@ -1,5 +1,6 @@
 require 'fileutils'
 require 'json'
+require 'timeout'
 
 module Fastlane
   module Helper
@@ -31,6 +32,8 @@ module Fastlane
         wait_for_build_processing
         build_processing_timeout
         build_processing_poll_interval
+        build_processing_retry_limit
+        build_processing_retry_interval
         submission_information
         force
       ].freeze
@@ -53,6 +56,8 @@ module Fastlane
         wait_for_build_processing: true,
         build_processing_timeout: 3600,
         build_processing_poll_interval: 30,
+        build_processing_retry_limit: 3,
+        build_processing_retry_interval: 15,
         force: true
       }.freeze
 
@@ -68,6 +73,8 @@ module Fastlane
         wait_for_build_processing
         build_processing_timeout
         build_processing_poll_interval
+        build_processing_retry_limit
+        build_processing_retry_interval
         distribute_external
         notify_external_testers
         groups
@@ -78,6 +85,8 @@ module Fastlane
         wait_for_build_processing: true,
         build_processing_timeout: 3600,
         build_processing_poll_interval: 30,
+        build_processing_retry_limit: 3,
+        build_processing_retry_interval: 15,
         distribute_external: false,
         notify_external_testers: false
       }.freeze
@@ -349,20 +358,8 @@ module Fastlane
       end
 
       def self.find_build(params, app, platform)
-        require 'fastlane_core/build_watcher'
-
         if params[:wait_for_build_processing]
-          return FastlaneCore::BuildWatcher.wait_for_build_processing_to_be_complete(
-            app_id: app.id,
-            app_version: params[:app_version].to_s,
-            build_version: params[:build_number].to_s,
-            platform: platform,
-            poll_interval: params[:build_processing_poll_interval].to_i,
-            timeout_duration: params[:build_processing_timeout].to_i,
-            return_when_build_appears: false,
-            return_spaceship_testflight_build: false,
-            select_latest: false
-          )
+          return wait_for_build_processing(params, app, platform, params[:build_number])
         end
 
         build = Spaceship::ConnectAPI::Build.all(
@@ -378,20 +375,8 @@ module Fastlane
       end
 
       def self.find_testflight_build(params, app, platform)
-        require 'fastlane_core/build_watcher'
-
         if params[:wait_for_build_processing]
-          return FastlaneCore::BuildWatcher.wait_for_build_processing_to_be_complete(
-            app_id: app.id,
-            app_version: params[:app_version].to_s,
-            build_version: params[:testflight_build_number].to_s,
-            platform: platform,
-            poll_interval: params[:build_processing_poll_interval].to_i,
-            timeout_duration: params[:build_processing_timeout].to_i,
-            return_when_build_appears: false,
-            return_spaceship_testflight_build: false,
-            select_latest: false
-          )
+          return wait_for_build_processing(params, app, platform, params[:testflight_build_number])
         end
 
         build = Spaceship::ConnectAPI::Build.all(
@@ -406,7 +391,53 @@ module Fastlane
         build
       end
 
-      private_class_method :download_metadata, :download_screenshots, :authenticate, :find_build, :find_testflight_build
+      # App Store Connect 偶发中断 HTTPS 连接时，在原处理超时范围内重试查询。
+      def self.wait_for_build_processing(params, app, platform, build_number)
+        require 'fastlane_core/build_watcher'
+
+        timeout = params[:build_processing_timeout].to_i
+        deadline = Time.now + timeout
+        retry_limit = params[:build_processing_retry_limit].to_i
+        retry_interval = params[:build_processing_retry_interval].to_i
+        retry_count = 0
+
+        begin
+          remaining_timeout = [(deadline - Time.now).ceil, 1].max
+          return FastlaneCore::BuildWatcher.wait_for_build_processing_to_be_complete(
+            app_id: app.id,
+            app_version: params[:app_version].to_s,
+            build_version: build_number.to_s,
+            platform: platform,
+            poll_interval: params[:build_processing_poll_interval].to_i,
+            timeout_duration: remaining_timeout,
+            return_when_build_appears: false,
+            return_spaceship_testflight_build: false,
+            select_latest: false
+          )
+        rescue StandardError => error
+          raise unless retryable_build_processing_error?(error)
+          raise if retry_count >= retry_limit || Time.now >= deadline
+
+          retry_count += 1
+          wait_seconds = [retry_interval, [(deadline - Time.now).floor, 0].max].min
+          UI.important(
+            "App Store Connect 查询构建时网络异常，将在 #{wait_seconds} 秒后第 #{retry_count}/#{retry_limit} 次重试: #{error.message}"
+          )
+          sleep(wait_seconds) if wait_seconds.positive?
+          retry
+        end
+      end
+
+      def self.retryable_build_processing_error?(error)
+        return true if error.is_a?(EOFError) || error.is_a?(SocketError) || error.is_a?(Timeout::Error)
+
+        error.message.match?(
+          /(SSL_connect|unexpected eof|connection (?:reset|aborted|failed)|execution expired|timed out|read timeout|socket error)/i
+        )
+      end
+
+      private_class_method :download_metadata, :download_screenshots, :authenticate, :find_build, :find_testflight_build,
+                           :wait_for_build_processing, :retryable_build_processing_error?
     end
   end
 end

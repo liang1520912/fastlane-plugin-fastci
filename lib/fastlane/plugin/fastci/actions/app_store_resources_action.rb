@@ -228,6 +228,20 @@ module Fastlane
             type: Integer
           ),
           FastlaneCore::ConfigItem.new(
+            key: :build_processing_retry_limit,
+            description: '查询构建处理状态遇到网络错误时的最大重试次数',
+            optional: true,
+            default_value: 3,
+            type: Integer
+          ),
+          FastlaneCore::ConfigItem.new(
+            key: :build_processing_retry_interval,
+            description: '查询构建处理状态网络错误后的重试等待时间，单位秒',
+            optional: true,
+            default_value: 15,
+            type: Integer
+          ),
+          FastlaneCore::ConfigItem.new(
             key: :submission_information,
             description: 'deliver 提交审核信息，例如出口合规声明',
             optional: true,

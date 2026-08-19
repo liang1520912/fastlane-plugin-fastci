@@ -83,6 +83,8 @@ describe Fastlane::Helper::AppStoreResourcesHelper do
           wait_for_build_processing: true,
           build_processing_timeout: 3600,
           build_processing_poll_interval: 30,
+          build_processing_retry_limit: 3,
+          build_processing_retry_interval: 15,
           force: true
       )
     end
@@ -225,6 +227,29 @@ describe Fastlane::Helper::AppStoreResourcesHelper do
           platform: 'ios'
         )
       end.to raise_error(FastlaneCore::Interface::FastlaneError, /build_number/)
+    end
+  end
+
+  describe 'build processing retries' do
+    it 'retries a transient SSL error while waiting for an App Store build' do
+      app = instance_double('Spaceship::ConnectAPI::App', id: 'app-id')
+      build = instance_double('Spaceship::ConnectAPI::Build')
+      params = {
+        app_version: '7.0.0',
+        build_number: '2026081906',
+        wait_for_build_processing: true,
+        build_processing_timeout: 60,
+        build_processing_poll_interval: 30,
+        build_processing_retry_limit: 1,
+        build_processing_retry_interval: 0
+      }
+
+      allow(FastlaneCore::BuildWatcher).to receive(:wait_for_build_processing_to_be_complete)
+        .and_raise(OpenSSL::SSL::SSLError, 'SSL_connect returned=1 unexpected eof while reading')
+        .then_return(build)
+
+      expect(described_class.send(:find_build, params, app, :ios)).to eq(build)
+      expect(FastlaneCore::BuildWatcher).to have_received(:wait_for_build_processing_to_be_complete).twice
     end
   end
 

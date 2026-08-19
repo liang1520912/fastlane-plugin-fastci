@@ -119,6 +119,8 @@ package(
   "wait_for_build_processing": true,
   "build_processing_timeout": 3600,
   "build_processing_poll_interval": 30,
+  "build_processing_retry_limit": 3,
+  "build_processing_retry_interval": 15,
   "distribute_external": false,
   "notify_external_testers": false
 }
@@ -187,6 +189,8 @@ app_store_resources(
   "wait_for_build_processing": true,
   "build_processing_timeout": 3600,
   "build_processing_poll_interval": 30,
+  "build_processing_retry_limit": 3,
+  "build_processing_retry_interval": 15,
   "submit_for_review": false,
   "automatic_release": false
 }
@@ -219,7 +223,8 @@ app_store_resources(
 - `select_build`：是否选择指定的 App Store Connect 构建，默认 `false`。
 - `build_number`：要选择的精确构建号。开启 `select_build` 或 `submit_for_review` 时必须填写，不会自动猜测最新构建。
 - `wait_for_build_processing`：选择构建前是否等待 Apple 处理完成，默认 `true`。
-- `build_processing_timeout` 和 `build_processing_poll_interval`：等待构建处理的超时时间和轮询间隔，单位均为秒。
+- `build_processing_timeout` 和 `build_processing_poll_interval`：等待构建处理的总超时时间和轮询间隔，单位均为秒。
+- `build_processing_retry_limit` 和 `build_processing_retry_interval`：查询构建状态遇到 SSL、连接中断或超时时的最大重试次数和重试间隔，默认分别为 `3` 和 `15` 秒；重试不会超过总超时时间。
 - `submit_for_review`：是否提交审核，默认 `false`。提交审核前会先选择指定构建。
 - `automatic_release`：审核通过后是否自动发布，默认 `false`；只在 `submit_for_review` 为 `true` 时生效。
 - `submission_information`：提交审核所需信息，例如 `{"export_compliance_uses_encryption": false}`。
